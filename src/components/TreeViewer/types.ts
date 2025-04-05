@@ -11,6 +11,8 @@ export interface RawNode {
 export interface NodeData {
   label: string;
   isHighlighted?: boolean;
+  isCollapsed?: boolean;
+  hasChildren?: boolean;
 }
 
 // 自定義的Flow Node類型

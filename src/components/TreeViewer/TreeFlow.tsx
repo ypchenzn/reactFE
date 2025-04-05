@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -8,6 +8,7 @@ import ReactFlow, {
   ReactFlowProvider,
   ConnectionLineType,
   MarkerType,
+  NodeMouseHandler,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Box } from '@mui/material';
@@ -44,6 +45,47 @@ const animatedEdge = {
 const TreeFlow = ({ treeData, searchQuery }: TreeFlowProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState<NodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  // 追蹤收縮的節點
+  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
+
+  // 收集所有子孫節點的函數
+  const getDescendants = useCallback((nodeId: string, nodeMap: Map<string, RawNode>): string[] => {
+    const result: string[] = [];
+    const node = nodeMap.get(nodeId);
+    
+    if (!node) return result;
+    
+    // 遞迴收集子孫節點
+    const collectDescendants = (id: string) => {
+      const currentNode = nodeMap.get(id);
+      if (!currentNode) return;
+      
+      currentNode.children.forEach(childId => {
+        result.push(childId);
+        collectDescendants(childId);
+      });
+    };
+    
+    collectDescendants(nodeId);
+    return result;
+  }, []);
+
+  // 處理節點點擊事件
+  const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
+    const nodeId = node.id;
+    
+    setCollapsedNodes(prevCollapsed => {
+      const newCollapsed = new Set(prevCollapsed);
+      if (newCollapsed.has(nodeId)) {
+        // 如果節點已經收縮，則展開
+        newCollapsed.delete(nodeId);
+      } else {
+        // 否則收縮
+        newCollapsed.add(nodeId);
+      }
+      return newCollapsed;
+    });
+  }, []);
 
   // 將輸入的樹狀資料處理成符合ReactFlow的節點和邊緣格式
   const processTreeData = useCallback((data: RawNode[]): ProcessedTreeData => {
@@ -60,6 +102,14 @@ const TreeFlow = ({ treeData, searchQuery }: TreeFlowProps) => {
     
     const processedNodes: CustomNodeType[] = [];
     const processedEdges: CustomEdge[] = [];
+
+    // 獲取所有被隱藏的節點IDs (所有收縮節點的子孫)
+    const hiddenNodeIds = new Set<string>();
+    collapsedNodes.forEach(nodeId => {
+      // 獲取該節點的所有子孫
+      const descendants = getDescendants(nodeId, nodeMap);
+      descendants.forEach(id => hiddenNodeIds.add(id));
+    });
     
     // 計算每個節點在其層級中所佔的高度
     const calculateNodeHeights = (nodeId: string, levelMap: Map<number, number[]>) => {
@@ -74,6 +124,9 @@ const TreeFlow = ({ treeData, searchQuery }: TreeFlowProps) => {
       let maxDepth = 0;
       
       for (const childId of node.children) {
+        // 跳過隱藏的子節點
+        if (hiddenNodeIds.has(childId)) continue;
+        
         const { height, maxDepth: childDepth } = calculateNodeHeights(childId, levelMap);
         totalHeight += height;
         maxDepth = Math.max(maxDepth, childDepth + 1);
@@ -106,18 +159,20 @@ const TreeFlow = ({ treeData, searchQuery }: TreeFlowProps) => {
           label: node.label || node.id,
           isHighlighted: searchQuery ? (node.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
                                        (node.label || '').toLowerCase().includes(searchQuery.toLowerCase())) 
-                                     : false
+                                     : false,
+          isCollapsed: collapsedNodes.has(node.id),
+          hasChildren: node.children.length > 0
         },
       });
       
-      // 如果沒有子節點，直接返回
-      if (node.children.length === 0) return 1;
+      // 如果沒有子節點或節點已收縮，直接返回
+      if (node.children.length === 0 || collapsedNodes.has(node.id)) return 1;
       
       // 處理單個子節點的特殊情況
       if (node.children.length === 1) {
         const childId = node.children[0];
         const childNode = nodeMap.get(childId);
-        if (childNode) {
+        if (childNode && !hiddenNodeIds.has(childId)) {
           // 創建從當前節點到子節點的邊
           processedEdges.push({
             id: `${node.id}-${childId}`,
@@ -150,8 +205,10 @@ const TreeFlow = ({ treeData, searchQuery }: TreeFlowProps) => {
       let childVerticalStart = verticalPosition;
       let totalChildrenHeight = 0;
       
-      // 計算每個子節點的高度總和
-      node.children.forEach(childId => {
+      // 計算每個子節點的高度總和 (排除隱藏節點)
+      const visibleChildren = node.children.filter(childId => !hiddenNodeIds.has(childId));
+      
+      visibleChildren.forEach(childId => {
         const childNode = nodeMap.get(childId);
         if (childNode) {
           const { height } = calculateNodeHeights(childId, new Map());
@@ -160,7 +217,7 @@ const TreeFlow = ({ treeData, searchQuery }: TreeFlowProps) => {
       });
       
       // 垂直間距總量 (根據子節點數量調整)
-      const totalGapSpace = (node.children.length - 1) * (nodeGap + (node.children.length * 10));
+      const totalGapSpace = (visibleChildren.length - 1) * (nodeGap + (visibleChildren.length * 10));
       
       // 所有子節點的總高度
       const totalSpaceNeeded = totalChildrenHeight * nodeHeight + totalGapSpace;
@@ -171,7 +228,7 @@ const TreeFlow = ({ treeData, searchQuery }: TreeFlowProps) => {
       // 為每個子節點創建邊並計算位置
       let currentVerticalPosition = childVerticalStart;
       
-      node.children.forEach(childId => {
+      visibleChildren.forEach(childId => {
         const childNode = nodeMap.get(childId);
         if (childNode) {
           // 創建從當前節點到子節點的邊
@@ -198,7 +255,7 @@ const TreeFlow = ({ treeData, searchQuery }: TreeFlowProps) => {
           // 計算並設置子節點位置
           const childHeight = calculatePosition(childNode, level + 1, currentVerticalPosition, levelWidths);
           // 根據子節點數量和層級動態調整垂直間距
-          const adjustedGap = nodeGap + (node.children.length * 10);
+          const adjustedGap = nodeGap + (visibleChildren.length * 10);
           currentVerticalPosition += childHeight * nodeHeight + adjustedGap;
         }
       });
@@ -210,16 +267,16 @@ const TreeFlow = ({ treeData, searchQuery }: TreeFlowProps) => {
     calculatePosition(root, 0, 0, new Map());
     
     return { nodes: processedNodes, edges: processedEdges };
-  }, [searchQuery]);
+  }, [searchQuery, collapsedNodes, getDescendants]);
 
-  // 當樹狀資料或搜尋查詢變化時重新處理資料
+  // 當樹狀資料、搜尋查詢或收縮狀態變化時重新處理資料
   useEffect(() => {
     if (treeData && treeData.length > 0) {
       const { nodes: newNodes, edges: newEdges } = processTreeData(treeData);
       setNodes(newNodes);
       setEdges(newEdges);
     }
-  }, [treeData, processTreeData, setNodes, setEdges]);
+  }, [treeData, processTreeData, setNodes, setEdges, collapsedNodes]);
 
   // 預設流程配置 - 向左偏移以顯示根節點
   const defaultViewport = { x: 80, y: 200, zoom: 0.7 };
@@ -238,6 +295,7 @@ const TreeFlow = ({ treeData, searchQuery }: TreeFlowProps) => {
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         fitView
         minZoom={0.4}
