@@ -1,15 +1,16 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Box, Typography } from '@mui/material';
-import { Add as AddIcon, Remove as RemoveIcon } from '@mui/icons-material';
 import { NodeData } from './types';
 
 const CustomNode = ({ data }: NodeProps<NodeData>) => {
-  const showCollapseIndicator = data.hasChildren;
-  
   return (
     <>
-      <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        style={{ background: '#555', visibility: 'hidden' }} 
+      />
       <Box
         sx={{
           padding: '10px',
@@ -26,7 +27,7 @@ const CustomNode = ({ data }: NodeProps<NodeData>) => {
             : '0 1px 3px rgba(0, 0, 0, 0.1)',
           transition: 'all 0.2s ease',
           position: 'relative',
-          cursor: showCollapseIndicator ? 'pointer' : 'default',
+          cursor: data.hasChildren ? 'pointer' : 'default',
           '&:hover': {
             backgroundColor: data.isHighlighted ? '#ffd6e6' : '#f0f0f0',
             transform: 'scale(1.05)',
@@ -47,31 +48,12 @@ const CustomNode = ({ data }: NodeProps<NodeData>) => {
         >
           {data.label}
         </Typography>
-        
-        {showCollapseIndicator && (
-          <Box
-            sx={{
-              position: 'absolute',
-              right: '5px',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              width: '16px',
-              height: '16px',
-              borderRadius: '50%',
-              backgroundColor: '#f0f0f0',
-              border: '1px solid #ddd',
-            }}
-          >
-            {data.isCollapsed ? (
-              <AddIcon sx={{ fontSize: 12, color: '#555' }} />
-            ) : (
-              <RemoveIcon sx={{ fontSize: 12, color: '#555' }} />
-            )}
-          </Box>
-        )}
       </Box>
-      <Handle type="source" position={Position.Right} style={{ background: '#555' }} />
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        style={{ background: '#555', visibility: 'hidden' }} 
+      />
     </>
   );
 };
