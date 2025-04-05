@@ -7,6 +7,12 @@ export interface RawNode {
   label?: string;
 }
 
+// 邊資料格式（用於輸入）
+export interface EdgeData {
+  source: string;
+  target: string;
+}
+
 // 節點自定義資料
 export interface NodeData {
   label: string;

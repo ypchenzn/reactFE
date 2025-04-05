@@ -3,7 +3,7 @@ import { Box, styled, Toolbar } from '@mui/material';
 import NavigationBar from '@/components/NavigationBar';
 import Sidebar from '@/components/Sidebar';
 import TreeFlow from '@/components/TreeViewer/TreeFlow';
-import { RawNode } from '@/components/TreeViewer/types';
+import { EdgeData } from '@/components/TreeViewer/types';
 
 const Container = styled(Box)({
   display: 'flex',
@@ -29,15 +29,14 @@ const TreeViewerPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
-  // 範例樹狀資料 (A>B,A>C,A>D, B>E,B>F, D>G)
-  const treeData: RawNode[] = [
-    { id: 'A', children: ['B', 'C', 'D'] },
-    { id: 'B', children: ['E', 'F'] },
-    { id: 'C', children: [] },
-    { id: 'D', children: ['G'] },
-    { id: 'E', children: [] },
-    { id: 'F', children: [] },
-    { id: 'G', children: [] },
+  // 範例邊資料：A>B,A>C,A>D, B>E,B>F, D>G
+  const edgesData: EdgeData[] = [
+    { source: 'A', target: 'B' },
+    { source: 'A', target: 'C' },
+    { source: 'A', target: 'D' },
+    { source: 'B', target: 'E' },
+    { source: 'B', target: 'F' },
+    { source: 'D', target: 'G' }
   ];
 
   return (
@@ -57,7 +56,7 @@ const TreeViewerPage = () => {
           overflow: 'hidden'
         }}>
           <TreeFlow 
-            treeData={treeData} 
+            edgesData={edgesData} 
             searchQuery={searchQuery}
           />
         </Box>
