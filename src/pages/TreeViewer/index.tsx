@@ -34,12 +34,14 @@ const TreeViewerPage = () => {
     { source: 'A', target: 'B' },
     { source: 'A', target: 'C' },
     { source: 'A', target: 'D' },
-    { source: 'B', target: 'E' },
-    { source: 'B', target: 'F' },
+    { source: 'B', target: 'B1' },
+    { source: 'B', target: 'B2' },
+    { source: 'B', target: 'B3' },
+   
     { source: 'D', target: 'G' },
-    { source: 'A1', target: 'B1' },
-    { source: 'B1', target: 'E1' },
-    { source: 'B1', target: 'F1' },
+    { source: 'Z', target: 'X' },
+    { source: 'X', target: 'Y' },
+    { source: 'X', target: 'W' },
   ];
 
   return (

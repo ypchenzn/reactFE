@@ -17,9 +17,9 @@ import CustomNodeComponent from './CustomNode';
 
 const nodeWidth = 150;
 const nodeHeight = 40;
-const levelGap = 300; // 水平間距
+const levelGap = 300; // 水平間距（層級之間）
 const nodeGap = 100; // 節點垂直間距
-const treeVerticalGap = 200; // 樹之間的垂直間距
+const treeGap = 400; // 樹之間的水平間距
 
 interface TreeFlowProps {
   edgesData: EdgeData[];
@@ -116,27 +116,6 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
     return result;
   }, []);
 
-  // 計算樹的最大深度
-  const calculateTreeDepth = useCallback((rootId: string, nodeMap: Map<string, string[]>, hiddenNodeIds: Set<string>): number => {
-    const calculateDepth = (nodeId: string, currentDepth: number): number => {
-      const children = nodeMap.get(nodeId) || [];
-      const visibleChildren = children.filter(childId => !hiddenNodeIds.has(childId));
-      
-      if (visibleChildren.length === 0) {
-        return currentDepth;
-      }
-      
-      // 計算所有子節點的最大深度
-      const childDepths = visibleChildren.map(childId => 
-        calculateDepth(childId, currentDepth + 1)
-      );
-      
-      return Math.max(...childDepths);
-    };
-    
-    return calculateDepth(rootId, 0);
-  }, []);
-
   // 處理節點點擊事件
   const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
     const nodeId = node.id;
@@ -171,173 +150,187 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
       const descendants = getDescendants(nodeId, nodeMap);
       descendants.forEach(id => hiddenNodeIds.add(id));
     });
+
+    // 記錄每個層級的節點佔用情況，用於防止重疊
+    // 格式: Map<levelIndex, Map<y位置, 節點寬度>>
+    const levelOccupancy: Map<number, Map<number, number>> = new Map();
     
-    // 計算每個樹的深度
-    const treeDepths = rootNodes.map(rootId => 
-      calculateTreeDepth(rootId, nodeMap, hiddenNodeIds)
-    );
-    const maxTreeDepth = Math.max(...treeDepths);
-    
-    // 計算每個樹的寬度
-    const treeWidths: { [key: string]: number } = {};
-    
-    // 計算每個節點在其層級中所佔的高度
-    const calculateNodeHeights = (nodeId: string, depth: number = 0) => {
-      const children = nodeMap.get(nodeId) || [];
-      
-      if (children.length === 0 || collapsedNodes.has(nodeId)) {
-        return 1;
+    // 初始化層級佔用映射
+    const initLevelOccupancy = (maxLevel: number) => {
+      for (let i = 0; i <= maxLevel; i++) {
+        levelOccupancy.set(i, new Map());
       }
-      
-      let totalHeight = 0;
-      
-      const visibleChildren = children.filter(childId => !hiddenNodeIds.has(childId));
-      
-      visibleChildren.forEach(childId => {
-        totalHeight += calculateNodeHeights(childId, depth + 1);
-      });
-      
-      return Math.max(1, totalHeight);
     };
     
-    // 計算每棵樹的總高度，用於垂直排列樹
-    const treeHeights = rootNodes.map(rootId => {
-      return {
-        rootId,
-        height: calculateNodeHeights(rootId)
-      };
-    });
-    
-    // 初始化level位置映射 - 用於確保相同level的節點垂直對齊
-    const levelPositions: { [key: number]: number[] } = {};
-    
-    // 計算節點位置的輔助函數 (垂直佈局，根節點在上)
-    const calculatePositions = (
-      nodeId: string, 
-      treeIndex: number,
-      level: number = 0,
-      verticalPosition: number = 0
-    ): { treeHeight: number, maxY: number } => {
-      const children = nodeMap.get(nodeId) || [];
-      const visibleChildren = children.filter(childId => !hiddenNodeIds.has(childId));
+    // 檢查特定位置是否有重疊
+    const hasOverlap = (level: number, y: number, height: number): boolean => {
+      const levelMap = levelOccupancy.get(level);
+      if (!levelMap) return false;
       
-      // 計算x坐標 - 根據層級
-      const x = level * levelGap;
-      
-      // 計算y坐標
-      const y = verticalPosition;
-      
-      // 添加節點
-      processedNodes.push({
-        id: nodeId,
-        type: 'customNode',
-        position: { x, y },
-        data: { 
-          label: nodeId, // 使用節點ID作為標籤
-          isHighlighted: searchQuery ? nodeId.toLowerCase().includes(searchQuery.toLowerCase()) : false,
-          isCollapsed: collapsedNodes.has(nodeId),
-          hasChildren: children.length > 0
-        },
-      });
-      
-      // 如果沒有子節點或節點已收縮，返回
-      if (visibleChildren.length === 0 || collapsedNodes.has(nodeId)) {
-        return { treeHeight: 1, maxY: y };
+      // 檢查所有已佔用的位置，是否有與當前節點重疊
+      for (const [existingY, existingHeight] of levelMap.entries()) {
+        // 檢查垂直方向是否重疊
+        if (
+          (y >= existingY && y < existingY + existingHeight) || 
+          (y + height > existingY && y + height <= existingY + existingHeight) ||
+          (existingY >= y && existingY < y + height)
+        ) {
+          return true;
+        }
       }
       
-      // 計算子節點佔用的總高度
-      let totalChildHeight = 0;
-      const childHeights: number[] = [];
+      return false;
+    };
+    
+    // 標記位置為已佔用
+    const markOccupied = (level: number, y: number, height: number) => {
+      const levelMap = levelOccupancy.get(level);
+      if (levelMap) {
+        levelMap.set(y, height);
+      }
+    };
+    
+    // 找到可用的垂直位置
+    const findAvailablePosition = (level: number, nodeHeight: number, startY: number): number => {
+      let y = startY;
       
-      visibleChildren.forEach(childId => {
-        const height = calculateNodeHeights(childId);
-        childHeights.push(height);
-        totalChildHeight += height;
-      });
+      // 如果當前位置重疊，嘗試往下移動直到找到無重疊的位置
+      while (hasOverlap(level, y, nodeHeight)) {
+        y += nodeGap;
+      }
       
-      // 計算間隔高度
-      const totalGapSpace = (visibleChildren.length - 1) * nodeGap;
-      
-      // 總空間需求
-      const totalSpace = totalChildHeight * nodeHeight + totalGapSpace;
-      
-      // 子節點起始垂直位置
-      let childVerticalPos = y - totalSpace / 2 + nodeHeight / 2;
-      let maxChildY = 0;
-      
-      // 為每個子節點創建邊並計算位置
-      visibleChildren.forEach((childId, index) => {
-        // 計算子節點高度
-        const childHeight = childHeights[index];
+      return y;
+    };
+    
+    // 估算樹的最大深度
+    const estimateMaxDepth = (rootId: string): number => {
+      const getDepth = (nodeId: string, depth = 0): number => {
+        if (hiddenNodeIds.has(nodeId) || collapsedNodes.has(nodeId)) return depth;
         
-        // 創建從當前節點到子節點的邊
-        processedEdges.push({
-          id: `${nodeId}-${childId}`,
-          source: nodeId,
-          target: childId,
-          type: 'smoothstep',
-          animated: true,
-          style: { 
-            stroke: '#666', 
-            strokeWidth: 2, 
-            strokeDasharray: '6 3',
+        const children = nodeMap.get(nodeId) || [];
+        if (children.length === 0) return depth;
+        
+        return Math.max(...children.map(childId => getDepth(childId, depth + 1)));
+      };
+      
+      return getDepth(rootId);
+    };
+    
+    // 計算所有樹的最大深度
+    const maxDepth = Math.max(...rootNodes.map(estimateMaxDepth)) + 1;
+    initLevelOccupancy(maxDepth);
+    
+    // 為每棵樹分配水平空間
+    let currentTreeX = 0;
+    
+    // 處理每棵樹
+    rootNodes.forEach((rootId, treeIndex) => {
+      const processNode = (
+        nodeId: string,
+        level: number,
+        parentX: number,
+        parentY: number
+      ): { width: number; height: number; bottomY: number } => {
+        if (hiddenNodeIds.has(nodeId)) {
+          return { width: 0, height: 0, bottomY: parentY };
+        }
+        
+        const children = nodeMap.get(nodeId) || [];
+        const visibleChildren = children.filter(childId => !hiddenNodeIds.has(childId));
+        
+        // 計算當前節點的位置
+        const x = currentTreeX + level * levelGap;
+        // 初始垂直位置從父節點位置開始，如果是根節點則從0開始
+        let y = level === 0 ? 0 : parentY;
+        
+        // 找到不與同層級節點重疊的垂直位置
+        y = findAvailablePosition(level, nodeHeight, y);
+        
+        // 標記當前節點佔用的位置
+        markOccupied(level, y, nodeHeight);
+        
+        // 添加節點
+        processedNodes.push({
+          id: nodeId,
+          type: 'customNode',
+          position: { x, y },
+          data: { 
+            label: nodeId,
+            isHighlighted: searchQuery ? nodeId.toLowerCase().includes(searchQuery.toLowerCase()) : false,
+            isCollapsed: collapsedNodes.has(nodeId),
+            hasChildren: children.length > 0
           },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 18,
-            height: 18,
-            color: '#666',
-          },
-          className: 'animated-edge'
         });
         
-        // 計算子節點位置
-        const result = calculatePositions(
-          childId, 
-          treeIndex,
-          level + 1, 
-          childVerticalPos + (childHeight * nodeHeight) / 2
-        );
+        // 如果節點已收縮或沒有子節點，它只佔一個節點的空間
+        if (collapsedNodes.has(nodeId) || visibleChildren.length === 0) {
+          return { width: nodeWidth, height: nodeHeight, bottomY: y + nodeHeight };
+        }
         
-        maxChildY = Math.max(maxChildY, result.maxY);
+        // 計算子節點布局
+        let maxChildWidth = 0;
+        let totalHeight = 0;
+        let lastBottomY = y;
         
-        // 更新下一個子節點的垂直位置
-        childVerticalPos += childHeight * nodeHeight + nodeGap;
-      });
-      
-      return { 
-        treeHeight: totalChildHeight > 0 ? totalChildHeight : 1,
-        maxY: Math.max(y, maxChildY)
+        // 處理每個子節點
+        visibleChildren.forEach((childId, index) => {
+          // 計算子節點的布局
+          const childResult = processNode(
+            childId,
+            level + 1,
+            x + nodeWidth,
+            lastBottomY + (index > 0 ? nodeGap : 0)
+          );
+          
+          // 更新最後一個子節點的底部Y坐標
+          lastBottomY = childResult.bottomY;
+          
+          // 添加連接邊
+          processedEdges.push({
+            id: `${nodeId}-${childId}`,
+            source: nodeId,
+            target: childId,
+            type: 'smoothstep',
+            animated: true,
+            style: { 
+              stroke: '#666', 
+              strokeWidth: 2, 
+              strokeDasharray: '6 3',
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 18,
+              height: 18,
+              color: '#666',
+            },
+            className: 'animated-edge'
+          });
+          
+          // 更新最大子節點寬度和總高度
+          maxChildWidth = Math.max(maxChildWidth, childResult.width);
+          totalHeight += childResult.height + (index > 0 ? nodeGap : 0);
+        });
+        
+        // 計算當前節點子樹的寬度和高度
+        const subtreeWidth = maxChildWidth + levelGap;
+        const subtreeHeight = Math.max(nodeHeight, totalHeight);
+        
+        return { 
+          width: Math.max(nodeWidth, subtreeWidth), 
+          height: subtreeHeight,
+          bottomY: Math.max(y + nodeHeight, lastBottomY)
+        };
       };
-    };
-
-    // 計算每棵樹的垂直起始位置
-    let currentTreeY = 0;
-    const treePositions: number[] = [];
-    
-    // 從每個根節點開始計算垂直位置
-    rootNodes.forEach((_, index) => {
-      treePositions.push(currentTreeY);
-      if (index < rootNodes.length - 1) {
-        const currentTreeHeight = treeHeights[index].height * nodeHeight;
-        currentTreeY += currentTreeHeight + treeVerticalGap;
-      }
-    });
-    
-    // 從每個根節點開始計算所有節點位置
-    rootNodes.forEach((rootId, index) => {
-      calculatePositions(rootId, index, 0, treePositions[index]);
+      
+      // 處理當前樹的根節點
+      const treeLayout = processNode(rootId, 0, 0, 0);
+      
+      // 為下一棵樹更新水平偏移
+      currentTreeX += treeLayout.width + treeGap;
     });
     
     return { nodes: processedNodes, edges: processedEdges };
-  }, [
-    searchQuery, 
-    collapsedNodes, 
-    getDescendants, 
-    buildNodeMapFromEdges, 
-    findRootNodes,
-    calculateTreeDepth
-  ]);
+  }, [searchQuery, collapsedNodes, getDescendants, buildNodeMapFromEdges, findRootNodes]);
 
   // 當邊資料、搜尋查詢或收縮狀態變化時重新處理資料
   useEffect(() => {
@@ -348,8 +341,8 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
     }
   }, [edgesData, processTreeData, setNodes, setEdges, collapsedNodes]);
 
-  // 預設流程配置 - 中央顯示
-  const defaultViewport = { x: 200, y: 0, zoom: 0.6 };
+  // 預設流程配置 - 向左偏移以顯示更多層級
+  const defaultViewport = { x: 50, y: 50, zoom: 0.7 };
 
   return (
     <Box sx={{ 
