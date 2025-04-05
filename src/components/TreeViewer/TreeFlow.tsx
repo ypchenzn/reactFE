@@ -17,8 +17,9 @@ import CustomNodeComponent from './CustomNode';
 
 const nodeWidth = 150;
 const nodeHeight = 40;
-const levelGap = 300; // 增加水平間距，從200增加到300
-const nodeGap = 100; // 增加節點垂直間距，從60增加到100
+const levelGap = 300; // 水平間距
+const nodeGap = 100; // 節點垂直間距
+const treeVerticalGap = 200; // 樹之間的垂直間距
 
 interface TreeFlowProps {
   edgesData: EdgeData[];
@@ -115,6 +116,27 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
     return result;
   }, []);
 
+  // 計算樹的最大深度
+  const calculateTreeDepth = useCallback((rootId: string, nodeMap: Map<string, string[]>, hiddenNodeIds: Set<string>): number => {
+    const calculateDepth = (nodeId: string, currentDepth: number): number => {
+      const children = nodeMap.get(nodeId) || [];
+      const visibleChildren = children.filter(childId => !hiddenNodeIds.has(childId));
+      
+      if (visibleChildren.length === 0) {
+        return currentDepth;
+      }
+      
+      // 計算所有子節點的最大深度
+      const childDepths = visibleChildren.map(childId => 
+        calculateDepth(childId, currentDepth + 1)
+      );
+      
+      return Math.max(...childDepths);
+    };
+    
+    return calculateDepth(rootId, 0);
+  }, []);
+
   // 處理節點點擊事件
   const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
     const nodeId = node.id;
@@ -136,10 +158,8 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
   const processTreeData = useCallback((edges: EdgeData[]): ProcessedTreeData => {
     // 從邊資料建立節點映射
     const nodeMap = buildNodeMapFromEdges(edges);
-    // 找到根節點
+    // 找到所有根節點
     const rootNodes = findRootNodes(edges);
-    // 假設只有一個根節點，如果有多個，可以添加一個虛擬根節點
-    const rootId = rootNodes[0];
     
     const processedNodes: CustomNodeType[] = [];
     const processedEdges: CustomEdge[] = [];
@@ -152,45 +172,60 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
       descendants.forEach(id => hiddenNodeIds.add(id));
     });
     
+    // 計算每個樹的深度
+    const treeDepths = rootNodes.map(rootId => 
+      calculateTreeDepth(rootId, nodeMap, hiddenNodeIds)
+    );
+    const maxTreeDepth = Math.max(...treeDepths);
+    
+    // 計算每個樹的寬度
+    const treeWidths: { [key: string]: number } = {};
+    
     // 計算每個節點在其層級中所佔的高度
-    const calculateNodeHeights = (nodeId: string, levelMap: Map<number, number[]>) => {
+    const calculateNodeHeights = (nodeId: string, depth: number = 0) => {
       const children = nodeMap.get(nodeId) || [];
       
-      if (children.length === 0) {
-        return { height: 1, maxDepth: 0 };
+      if (children.length === 0 || collapsedNodes.has(nodeId)) {
+        return 1;
       }
       
       let totalHeight = 0;
-      let maxDepth = 0;
       
-      for (const childId of children) {
-        // 跳過隱藏的子節點
-        if (hiddenNodeIds.has(childId)) continue;
-        
-        const { height, maxDepth: childDepth } = calculateNodeHeights(childId, levelMap);
-        totalHeight += height;
-        maxDepth = Math.max(maxDepth, childDepth + 1);
-      }
+      const visibleChildren = children.filter(childId => !hiddenNodeIds.has(childId));
       
-      return { height: Math.max(1, totalHeight), maxDepth };
+      visibleChildren.forEach(childId => {
+        totalHeight += calculateNodeHeights(childId, depth + 1);
+      });
+      
+      return Math.max(1, totalHeight);
     };
     
-    // 獲取根節點的高度計算
-    const rootHeightData = calculateNodeHeights(rootId, new Map());
+    // 計算每棵樹的總高度，用於垂直排列樹
+    const treeHeights = rootNodes.map(rootId => {
+      return {
+        rootId,
+        height: calculateNodeHeights(rootId)
+      };
+    });
     
-    // 計算節點位置的輔助函數 (水平佈局)
-    const calculatePosition = (
+    // 初始化level位置映射 - 用於確保相同level的節點垂直對齊
+    const levelPositions: { [key: number]: number[] } = {};
+    
+    // 計算節點位置的輔助函數 (垂直佈局，根節點在上)
+    const calculatePositions = (
       nodeId: string, 
-      level: number, 
-      verticalPosition: number, 
-      levelWidths: Map<number, number[]>
-    ): number => {
-      // x軸是水平方向，現在根據層級決定
-      const x = level * levelGap;
-      // y軸是垂直方向
-      const y = verticalPosition;
-      
+      treeIndex: number,
+      level: number = 0,
+      verticalPosition: number = 0
+    ): { treeHeight: number, maxY: number } => {
       const children = nodeMap.get(nodeId) || [];
+      const visibleChildren = children.filter(childId => !hiddenNodeIds.has(childId));
+      
+      // 計算x坐標 - 根據層級
+      const x = level * levelGap;
+      
+      // 計算y坐標
+      const y = verticalPosition;
       
       // 添加節點
       processedNodes.push({
@@ -205,66 +240,36 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
         },
       });
       
-      // 如果沒有子節點或節點已收縮，直接返回
-      if (children.length === 0 || collapsedNodes.has(nodeId)) return 1;
-      
-      // 處理單個子節點的特殊情況
-      if (children.length === 1) {
-        const childId = children[0];
-        if (!hiddenNodeIds.has(childId)) {
-          // 創建從當前節點到子節點的邊
-          processedEdges.push({
-            id: `${nodeId}-${childId}`,
-            source: nodeId,
-            target: childId,
-            type: 'smoothstep',
-            animated: true,
-            style: { 
-              stroke: '#666', 
-              strokeWidth: 2, 
-              strokeDasharray: '6 3',
-            },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              width: 18,
-              height: 18,
-              color: '#666',
-            },
-            className: 'animated-edge'
-          });
-          
-          // 單個子節點垂直位置與父節點相同
-          const childHeight: number = calculatePosition(childId, level + 1, verticalPosition, levelWidths);
-          return childHeight;
-        }
-        return 1;
+      // 如果沒有子節點或節點已收縮，返回
+      if (visibleChildren.length === 0 || collapsedNodes.has(nodeId)) {
+        return { treeHeight: 1, maxY: y };
       }
       
-      // 計算子節點的垂直起始位置
-      let childVerticalStart = verticalPosition;
-      let totalChildrenHeight = 0;
-      
-      // 計算每個子節點的高度總和 (排除隱藏節點)
-      const visibleChildren = children.filter(childId => !hiddenNodeIds.has(childId));
+      // 計算子節點佔用的總高度
+      let totalChildHeight = 0;
+      const childHeights: number[] = [];
       
       visibleChildren.forEach(childId => {
-        const { height } = calculateNodeHeights(childId, new Map());
-        totalChildrenHeight += height;
+        const height = calculateNodeHeights(childId);
+        childHeights.push(height);
+        totalChildHeight += height;
       });
       
-      // 垂直間距總量 (根據子節點數量調整)
-      const totalGapSpace = (visibleChildren.length - 1) * (nodeGap + (visibleChildren.length * 10));
+      // 計算間隔高度
+      const totalGapSpace = (visibleChildren.length - 1) * nodeGap;
       
-      // 所有子節點的總高度
-      const totalSpaceNeeded = totalChildrenHeight * nodeHeight + totalGapSpace;
+      // 總空間需求
+      const totalSpace = totalChildHeight * nodeHeight + totalGapSpace;
       
-      // 計算起始位置偏移，使子節點群組垂直居中於父節點
-      childVerticalStart = verticalPosition - (totalSpaceNeeded / 2) + (nodeHeight / 2);
+      // 子節點起始垂直位置
+      let childVerticalPos = y - totalSpace / 2 + nodeHeight / 2;
+      let maxChildY = 0;
       
       // 為每個子節點創建邊並計算位置
-      let currentVerticalPosition = childVerticalStart;
-      
-      visibleChildren.forEach(childId => {
+      visibleChildren.forEach((childId, index) => {
+        // 計算子節點高度
+        const childHeight = childHeights[index];
+        
         // 創建從當前節點到子節點的邊
         processedEdges.push({
           id: `${nodeId}-${childId}`,
@@ -286,21 +291,53 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
           className: 'animated-edge'
         });
         
-        // 計算並設置子節點位置
-        const childHeight = calculatePosition(childId, level + 1, currentVerticalPosition, levelWidths);
-        // 根據子節點數量和層級動態調整垂直間距
-        const adjustedGap = nodeGap + (visibleChildren.length * 10);
-        currentVerticalPosition += childHeight * nodeHeight + adjustedGap;
+        // 計算子節點位置
+        const result = calculatePositions(
+          childId, 
+          treeIndex,
+          level + 1, 
+          childVerticalPos + (childHeight * nodeHeight) / 2
+        );
+        
+        maxChildY = Math.max(maxChildY, result.maxY);
+        
+        // 更新下一個子節點的垂直位置
+        childVerticalPos += childHeight * nodeHeight + nodeGap;
       });
       
-      return totalChildrenHeight > 0 ? totalChildrenHeight : 1;
+      return { 
+        treeHeight: totalChildHeight > 0 ? totalChildHeight : 1,
+        maxY: Math.max(y, maxChildY)
+      };
     };
+
+    // 計算每棵樹的垂直起始位置
+    let currentTreeY = 0;
+    const treePositions: number[] = [];
     
-    // 從根節點開始計算位置
-    calculatePosition(rootId, 0, 0, new Map());
+    // 從每個根節點開始計算垂直位置
+    rootNodes.forEach((_, index) => {
+      treePositions.push(currentTreeY);
+      if (index < rootNodes.length - 1) {
+        const currentTreeHeight = treeHeights[index].height * nodeHeight;
+        currentTreeY += currentTreeHeight + treeVerticalGap;
+      }
+    });
+    
+    // 從每個根節點開始計算所有節點位置
+    rootNodes.forEach((rootId, index) => {
+      calculatePositions(rootId, index, 0, treePositions[index]);
+    });
     
     return { nodes: processedNodes, edges: processedEdges };
-  }, [searchQuery, collapsedNodes, getDescendants, buildNodeMapFromEdges, findRootNodes]);
+  }, [
+    searchQuery, 
+    collapsedNodes, 
+    getDescendants, 
+    buildNodeMapFromEdges, 
+    findRootNodes,
+    calculateTreeDepth
+  ]);
 
   // 當邊資料、搜尋查詢或收縮狀態變化時重新處理資料
   useEffect(() => {
@@ -311,8 +348,8 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
     }
   }, [edgesData, processTreeData, setNodes, setEdges, collapsedNodes]);
 
-  // 預設流程配置 - 向左偏移以顯示根節點
-  const defaultViewport = { x: 80, y: 200, zoom: 0.7 };
+  // 預設流程配置 - 中央顯示
+  const defaultViewport = { x: 200, y: 0, zoom: 0.6 };
 
   return (
     <Box sx={{ 
@@ -331,7 +368,7 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         fitView
-        minZoom={0.4}
+        minZoom={0.3}
         maxZoom={1.5}
         defaultViewport={defaultViewport}
         attributionPosition="bottom-left"
