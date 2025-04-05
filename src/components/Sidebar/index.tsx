@@ -226,12 +226,12 @@ const Sidebar = ({ open }: SidebarProps) => {
           {/* 檔案/資料夾搜尋 */}
           <SearchContainer elevation={1}>
             <Typography variant="caption" sx={{ display: 'block', mb: 0.5, pl: 0.5 }}>
-              SearchContext
+              Search
             </Typography>
             <TextField
               fullWidth
               size="small"
-              placeholder="輸入檔案或資料夾名稱..."
+              placeholder="flie name..."
               value={fileSearch}
               onChange={(e) => setFileSearch(e.target.value)}
               InputProps={{
