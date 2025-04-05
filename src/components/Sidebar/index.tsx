@@ -27,6 +27,8 @@ const StyledDrawer = styled(Drawer)(({ theme }) => ({
   '& .MuiDrawer-paper': {
     width: drawerWidth,
     boxSizing: 'border-box',
+    top: '64px', // AppBar 高度
+    height: 'calc(100% - 64px)', // 減去 AppBar 高度
     background: theme.palette.background.default,
     borderRight: `1px solid ${theme.palette.divider}`,
   },

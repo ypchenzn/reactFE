@@ -1,21 +1,28 @@
 import { useState } from 'react';
-import { Box, styled } from '@mui/material';
-import NavigationBar from '../../components/NavigationBar';
-import Sidebar from '../../components/Sidebar';
-import TreeFlow from '../../components/TreeViewer/TreeFlow';
-import { RawNode } from '../../components/TreeViewer/types';
+import { Box, styled, Toolbar } from '@mui/material';
+import NavigationBar from '@/components/NavigationBar';
+import Sidebar from '@/components/Sidebar';
+import TreeFlow from '@/components/TreeViewer/TreeFlow';
+import { RawNode } from '@/components/TreeViewer/types';
 
 const Container = styled(Box)({
   display: 'flex',
   flexDirection: 'column',
   height: '100vh',
-  width: '100%',
+  width: '100vw',
+  margin: 0,
+  padding: 0,
+  boxSizing: 'border-box',
+  overflow: 'hidden',
 });
 
 const Content = styled(Box)({
   display: 'flex',
   flex: 1,
+  width: '100%',
+  height: '100%',
   overflow: 'hidden',
+  marginTop: '64px', // 提供空間給固定位置的 AppBar
 });
 
 const TreeViewerPage = () => {
@@ -42,7 +49,13 @@ const TreeViewerPage = () => {
       />
       <Content>
         <Sidebar open={sidebarOpen} />
-        <Box sx={{ flex: 1, height: '100%' }}>
+        <Box sx={{ 
+          flex: 1, 
+          display: 'flex',
+          height: '100%', 
+          width: '100%',
+          overflow: 'hidden'
+        }}>
           <TreeFlow 
             treeData={treeData} 
             searchQuery={searchQuery}

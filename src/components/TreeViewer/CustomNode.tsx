@@ -6,7 +6,7 @@ import { NodeData } from './types';
 const CustomNode = ({ data }: NodeProps<NodeData>) => {
   return (
     <>
-      <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
       <Box
         sx={{
           padding: '10px',
@@ -43,7 +43,7 @@ const CustomNode = ({ data }: NodeProps<NodeData>) => {
           {data.label}
         </Typography>
       </Box>
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={Position.Right} style={{ background: '#555' }} />
     </>
   );
 };
