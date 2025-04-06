@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { Box, styled, Toolbar } from '@mui/material';
+import { 
+  Box, 
+  styled, 
+  //Toolbar 
+  } from '@mui/material';
 import NavigationBar from '@/components/NavigationBar';
 import Sidebar from '@/components/Sidebar';
 import TreeFlow from '@/components/TreeViewer/TreeFlow';
@@ -36,12 +40,11 @@ const TreeViewerPage = () => {
     { source: 'A', target: 'D' },
     { source: 'B', target: 'B1' },
     { source: 'B', target: 'B2' },
-    { source: 'B', target: 'B3' },
-   
+    { source: 'B', target: 'B3' },   
     { source: 'D', target: 'G' },
-    { source: 'Z', target: 'X' },
-    { source: 'X', target: 'Y' },
-    { source: 'X', target: 'W' },
+    // { source: 'Z', target: 'X' },
+    // { source: 'X', target: 'Y' },
+    // { source: 'X', target: 'W' },
   ];
 
   return (

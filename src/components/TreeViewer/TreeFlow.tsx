@@ -225,6 +225,7 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
     
     // 處理每棵樹
     rootNodes.forEach((rootId, treeIndex) => {
+      console.log('treeIndex', treeIndex);
       const processNode = (
         nodeId: string,
         level: number,
@@ -232,6 +233,8 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
         parentY: number
       ): { width: number; height: number; bottomY: number } => {
         if (hiddenNodeIds.has(nodeId)) {
+          console.log('parentX', parentX);
+          console.log('parentY', parentY);
           return { width: 0, height: 0, bottomY: parentY };
         }
         

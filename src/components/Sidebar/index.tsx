@@ -21,7 +21,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
   Search as SearchIcon,
-  FolderSpecial as RootFolderIcon,
+  //FolderSpecial as RootFolderIcon,
 } from '@mui/icons-material';
 
 // 抽屜寬度
@@ -93,12 +93,12 @@ const Sidebar = ({ open }: SidebarProps) => {
   // 存儲已展開的資料夾ID
   const [expanded, setExpanded] = useState<string[]>(['root']);
   // 搜尋關鍵字
-  const [rootSearch, setRootSearch] = useState('');
+  //const [rootSearch, setRootSearch] = useState('');
   const [fileSearch, setFileSearch] = useState('');
   // 用於高亮顯示的搜尋結果節點
   const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
   // 保存找到節點的父節點路徑
-  const [nodePaths, setNodePaths] = useState<Map<string, string[]>>(new Map());
+  //const [nodePaths, setNodePaths] = useState<Map<string, string[]>>(new Map());
 
   // 搜尋檔案或資料夾並展開與高亮
   useEffect(() => {
@@ -129,7 +129,7 @@ const Sidebar = ({ open }: SidebarProps) => {
     
     // 設置高亮節點和路徑
     setHighlightedNodes(newHighlighted);
-    setNodePaths(paths);
+    //setNodePaths(paths);
     
     // 自動展開找到的節點的父節點路徑
     if (newHighlighted.size > 0) {
