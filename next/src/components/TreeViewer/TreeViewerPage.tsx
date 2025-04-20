@@ -5,7 +5,7 @@ import { Box, styled } from '@mui/material';
 import NavigationBar from '@/components/NavigationBar';
 import Sidebar from '@/components/Sidebar';
 import TreeFlow from '@/components/TreeViewer/TreeFlow';
-import { EdgeData } from '@/components/TreeViewer/types';
+import { bondType, EdgeData, TreeViewerType } from '@/components/TreeViewer/types';
 
 const Container = styled(Box)({
   display: 'flex',
@@ -30,17 +30,22 @@ const Content = styled(Box)({
 const TreeViewerPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [treeType, setTreeType] = useState<TreeViewerType>(TreeViewerType.FORWARD);
   
   // 範例邊資料：A>B,A>C,A>D, B>E,B>F, D>G
   const edgesData: EdgeData[] = [
-    { source: 'A', target: 'B' },
-    { source: 'A', target: 'C' },
-    { source: 'A', target: 'D' },
-    { source: 'B', target: 'B1' },
-    { source: 'B', target: 'B2' },
-    { source: 'B', target: 'B3' },   
-    { source: 'D', target: 'G' },
+    { source: 'A', target: 'B' ,type: bondType.SRC},
+    { source: 'A', target: 'C' ,type: bondType.SRC},
+    { source: 'A', target: 'D' ,type: bondType.SRC},
+    { source: 'B', target: 'B1' ,type: bondType.SRC},
+    { source: 'B', target: 'B2' ,type: bondType.SRC},
+    { source: 'B', target: 'B3' ,type: bondType.SRC},   
+    { source: 'D', target: 'G' ,type: bondType.SRC},
   ];
+
+  const handleTreeTypeChange = (type: TreeViewerType) => {
+    setTreeType(type);
+  };
 
   return (
     <Container>
@@ -50,7 +55,10 @@ const TreeViewerPage = () => {
         toggleSidebar={() => setSidebarOpen(!sidebarOpen)}
       />
       <Content>
-        <Sidebar open={sidebarOpen} />
+        <Sidebar 
+          open={sidebarOpen} 
+          onTreeTypeChange={handleTreeTypeChange}
+        />
         <Box sx={{ 
           flex: 1, 
           display: 'flex',
@@ -61,6 +69,7 @@ const TreeViewerPage = () => {
           <TreeFlow 
             edgesData={edgesData} 
             searchQuery={searchQuery}
+            treeType={treeType}
           />
         </Box>
       </Content>

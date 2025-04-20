@@ -11,6 +11,7 @@ export interface RawNode {
 export interface EdgeData {
   source: string;
   target: string;
+  type: bondType;
 }
 
 // 節點自定義資料
@@ -31,4 +32,14 @@ export type CustomEdge = Edge;
 export interface ProcessedTreeData {
   nodes: CustomNode[];
   edges: CustomEdge[];
+}
+
+export enum TreeViewerType {
+  FORWARD = 'forward',
+  BACKWARD = 'backward'
+} 
+
+export enum bondType {
+  SRC = 'SRC',
+  ADD = 'ADD'
 } 

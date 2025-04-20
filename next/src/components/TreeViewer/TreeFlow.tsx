@@ -14,7 +14,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Box } from '@mui/material';
-import { ProcessedTreeData, CustomNode as CustomNodeType, CustomEdge, NodeData, EdgeData } from './types';
+import { ProcessedTreeData, CustomNode as CustomNodeType, CustomEdge, NodeData, EdgeData, TreeViewerType } from './types';
 import CustomNodeComponent from './CustomNode';
 
 const nodeWidth = 150;
@@ -26,6 +26,7 @@ const treeGap = 400; // 樹之間的水平間距
 interface TreeFlowProps {
   edgesData: EdgeData[];
   searchQuery: string;
+  treeType: TreeViewerType;
 }
 
 // 註冊自定義節點
@@ -45,7 +46,7 @@ const animatedEdge = {
   }
 };
 
-const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
+const TreeFlow = ({ edgesData, searchQuery, treeType }: TreeFlowProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState<NodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   // 追蹤收縮的節點
@@ -243,10 +244,16 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
         const children = nodeMap.get(nodeId) || [];
         const visibleChildren = children.filter(childId => !hiddenNodeIds.has(childId));
         
-        // 計算當前節點的位置
-        const x = currentTreeX + level * levelGap;
-        // 初始垂直位置從父節點位置開始，如果是根節點則從0開始
-        let y = level === 0 ? 0 : parentY;
+        // 根據樹類型計算節點位置
+        let x, y;
+        if (treeType === TreeViewerType.FORWARD) {
+          x = currentTreeX + level * levelGap;
+          y = level === 0 ? 0 : parentY;
+        } else {
+          // BACKWARD 類型：從左下角開始，往左上生長
+          x = currentTreeX - level * levelGap;
+          y = level === 0 ? 0 : parentY;
+        }
         
         // 找到不與同層級節點重疊的垂直位置
         y = findAvailablePosition(level, nodeHeight, y);
@@ -283,18 +290,22 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
           const childResult = processNode(
             childId,
             level + 1,
-            x + nodeWidth,
+            x + (treeType === TreeViewerType.FORWARD ? nodeWidth : -nodeWidth),
             lastBottomY + (index > 0 ? nodeGap : 0)
           );
           
           // 更新最後一個子節點的底部Y坐標
           lastBottomY = childResult.bottomY;
           
-          // 添加連接邊
+          // 添加連接邊，根據樹類型決定方向
+          const edgeId = treeType === TreeViewerType.FORWARD 
+            ? `${nodeId}-${childId}`
+            : `${childId}-${nodeId}`;
+          
           processedEdges.push({
-            id: `${nodeId}-${childId}`,
-            source: nodeId,
-            target: childId,
+            id: edgeId,
+            source: treeType === TreeViewerType.FORWARD ? nodeId : childId,
+            target: treeType === TreeViewerType.FORWARD ? childId : nodeId,
             type: 'smoothstep',
             animated: true,
             style: { 
@@ -335,7 +346,7 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
     });
     
     return { nodes: processedNodes, edges: processedEdges };
-  }, [searchQuery, collapsedNodes, getDescendants, buildNodeMapFromEdges, findRootNodes]);
+  }, [searchQuery, collapsedNodes, getDescendants, buildNodeMapFromEdges, findRootNodes, treeType]);
 
   // 當邊資料、搜尋查詢或收縮狀態變化時重新處理資料
   useEffect(() => {

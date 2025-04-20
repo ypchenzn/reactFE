@@ -23,8 +23,9 @@ import {
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
   Search as SearchIcon,
-  //FolderSpecial as RootFolderIcon,
+  AccountTree as TreeIcon,
 } from '@mui/icons-material';
+import { TreeViewerType } from '@/components/TreeViewer/types';
 
 // 抽屜寬度
 const drawerWidth = 240;
@@ -49,58 +50,22 @@ const SearchContainer = styled(Paper)(({ theme }) => ({
   marginBottom: theme.spacing(1),
 }));
 
-// 範例檔案結構
-const mockFileStructure = {
-  id: 'root',
-  name: '根目錄',
-  children: [
-    {
-      id: 'folder1',
-      name: '資料夾 1',
-      children: [
-        { id: 'file1', name: '檔案 1.txt', children: [] },
-        { id: 'file2', name: '檔案 2.js', children: [] },
-      ],
-    },
-    {
-      id: 'folder2',
-      name: '資料夾 2',
-      children: [
-        { id: 'file3', name: '檔案 3.css', children: [] },
-        { 
-          id: 'folder3', 
-          name: '子資料夾',
-          children: [
-            { id: 'file4', name: '檔案 4.tsx', children: [] },
-          ],
-        },
-      ],
-    },
-    { id: 'file5', name: '檔案 5.html', children: [] },
-  ],
-};
-
-// 檔案節點介面
 interface FileNode {
   id: string;
   name: string;
   children: FileNode[];
+  onClick?: () => void;
 }
 
 interface SidebarProps {
   open: boolean;
+  onTreeTypeChange: (type: TreeViewerType) => void;
 }
 
-const Sidebar = ({ open }: SidebarProps) => {
-  // 存儲已展開的資料夾ID
+const Sidebar = ({ open, onTreeTypeChange }: SidebarProps) => {
   const [expanded, setExpanded] = useState<string[]>(['root']);
-  // 搜尋關鍵字
-  //const [rootSearch, setRootSearch] = useState('');
   const [fileSearch, setFileSearch] = useState('');
-  // 用於高亮顯示的搜尋結果節點
   const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
-  // 保存找到節點的父節點路徑
-  //const [nodePaths, setNodePaths] = useState<Map<string, string[]>>(new Map());
 
   // 搜尋檔案或資料夾並展開與高亮
   useEffect(() => {
@@ -131,7 +96,6 @@ const Sidebar = ({ open }: SidebarProps) => {
     
     // 設置高亮節點和路徑
     setHighlightedNodes(newHighlighted);
-    //setNodePaths(paths);
     
     // 自動展開找到的節點的父節點路徑
     if (newHighlighted.size > 0) {
@@ -152,7 +116,61 @@ const Sidebar = ({ open }: SidebarProps) => {
     });
   };
 
-  // 渲染檔案樹狀結構
+  // 處理樹類型切換
+  const handleTreeTypeClick = (type: TreeViewerType) => {
+    onTreeTypeChange(type);
+  };
+
+  // 修改 mockFileStructure 以包含樹類型選項
+  const mockFileStructure = {
+    id: 'root',
+    name: '根目錄',
+    children: [
+      {
+        id: 'treeTypes',
+        name: '樹狀圖類型',
+        children: [
+          { 
+            id: 'forward', 
+            name: '正向樹狀圖', 
+            children: [],
+            onClick: () => handleTreeTypeClick(TreeViewerType.FORWARD)
+          },
+          { 
+            id: 'backward', 
+            name: '反向樹狀圖', 
+            children: [],
+            onClick: () => handleTreeTypeClick(TreeViewerType.BACKWARD)
+          },
+        ],
+      },
+      {
+        id: 'folder1',
+        name: 'simple data',
+        children: [
+          { id: 'file1', name: 'fordward tree', children: [] },
+          { id: 'file2', name: 'backward tree', children: [] },
+        ],
+      },
+      {
+        id: 'folder2',
+        name: '資料夾 2',
+        children: [
+          { id: 'file3', name: '檔案 3.css', children: [] },
+          { 
+            id: 'folder3', 
+            name: '子資料夾',
+            children: [
+              { id: 'file4', name: '檔案 4.tsx', children: [] },
+            ],
+          },
+        ],
+      },
+      { id: 'file5', name: '檔案 5.html', children: [] },
+    ],
+  };
+
+  // 修改 renderTree 函數以支持點擊事件
   const renderTree = (node: FileNode, level: number = 0) => {
     const isFolder = node.children.length > 0;
     const isExpanded = expanded.includes(node.id);
@@ -161,7 +179,13 @@ const Sidebar = ({ open }: SidebarProps) => {
     return (
       <React.Fragment key={node.id}>
         <ListItemButton
-          onClick={() => isFolder && toggleExpand(node.id)}
+          onClick={() => {
+            if (isFolder) {
+              toggleExpand(node.id);
+            } else if ('onClick' in node) {
+              node.onClick();
+            }
+          }}
           sx={{ 
             pl: level * 2 + 1,
             backgroundColor: isHighlighted ? 'rgba(255, 0, 114, 0.1)' : 'transparent',
@@ -174,7 +198,7 @@ const Sidebar = ({ open }: SidebarProps) => {
             {isFolder ? (
               isExpanded ? <FolderOpenIcon color="primary" /> : <FolderIcon color="primary" />
             ) : (
-              <FileIcon color="action" />
+              <TreeIcon color="action" />
             )}
           </ListItemIcon>
           <ListItemText 
@@ -204,28 +228,6 @@ const Sidebar = ({ open }: SidebarProps) => {
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         {/* 搜尋框容器 */}
         <Box sx={{ p: 1, pt: 2 }}>
- 
-          {/* <SearchContainer elevation={1}>
-            <Typography variant="caption" sx={{ display: 'block', mb: 0.5, pl: 0.5 }}>
-              搜尋根目錄
-            </Typography>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="輸入根目錄名稱..."
-              value={rootSearch}
-              onChange={(e) => setRootSearch(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <RootFolderIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </SearchContainer> */}
-
-          {/* 檔案/資料夾搜尋 */}
           <SearchContainer elevation={1}>
             <Typography variant="caption" sx={{ display: 'block', mb: 0.5, pl: 0.5 }}>
               Search
@@ -233,7 +235,7 @@ const Sidebar = ({ open }: SidebarProps) => {
             <TextField
               fullWidth
               size="small"
-              placeholder="flie name..."
+              placeholder="file name..."
               value={fileSearch}
               onChange={(e) => setFileSearch(e.target.value)}
               InputProps={{

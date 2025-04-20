@@ -50,6 +50,11 @@ const CustomNode = ({ data }: NodeProps<NodeData>) => {
         </Typography>
       </Box>
       <Handle 
+        type="target" 
+        position={Position.Top} 
+        style={{ background: '#555', visibility: 'hidden' }} 
+      />
+      <Handle 
         type="source" 
         position={Position.Right} 
         style={{ background: '#555', visibility: 'hidden' }} 
