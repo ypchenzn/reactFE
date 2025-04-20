@@ -78,7 +78,7 @@ const TreeFlow = ({ edgesData, searchQuery }: TreeFlowProps) => {
     return nodeMap;
   }, []);
 
-  // 找到根節點（沒有被任何節點指向的節點）
+  // 找到根節點（沒有被任何節點指向的節點）(應該去掉料號)
   const findRootNodes = useCallback((edges: EdgeData[]) => {
     const allNodes = new Set<string>();
     const targetNodes = new Set<string>();

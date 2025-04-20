@@ -22,7 +22,7 @@ const Content = styled(Box)({
   display: 'flex',
   flex: 1,
   width: '100%',
-  height: '100%',
+  height: 'calc(100% - 64px)', // 減去 AppBar 高度
   overflow: 'hidden',
   marginTop: '64px', // 提供空間給固定位置的 AppBar
 });
